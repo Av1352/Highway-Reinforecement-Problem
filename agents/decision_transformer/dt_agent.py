@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm, trange
 import numpy as np
@@ -114,7 +114,7 @@ class RLDataset(Dataset):
     def __getitem__(self, idx):
         stacked_obs_seq = torch.stack(
             [torch.stack([self.observations[idx + t + offset] for offset in range(self.stack_size)], dim=0)
-             for t in range(self.sequence_len)], dim=0)
+            for t in range(self.sequence_len)], dim=0)
         actions_seq = self.actions[idx + self.stack_size - 1: idx + self.stack_size - 1 + self.sequence_len]
         returns_seq = self.returns[idx + self.stack_size - 1: idx + self.stack_size - 1 + self.sequence_len]
         timesteps_seq = self.timesteps[idx + self.stack_size - 1: idx + self.stack_size - 1 + self.sequence_len]

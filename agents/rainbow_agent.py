@@ -1,17 +1,10 @@
-# rainbow_agent.py
-
 import gymnasium as gym
 import numpy as np
-import highway_env
-import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-import os
+import random
 
-# Replay Memory with Prioritized Experience Replay
 class ReplayMemory:
     def __init__(self, capacity, alpha=0.6):
         self.capacity = capacity
@@ -27,10 +20,7 @@ class ReplayMemory:
         self.priorities[self.position] = max_priority
         self.position = (self.position + 1) % self.capacity
     def sample(self, batch_size, beta=0.4):
-        if len(self.memory) == self.capacity:
-            priorities = self.priorities
-        else:
-            priorities = self.priorities[:self.position]
+        priorities = self.priorities if len(self.memory) == self.capacity else self.priorities[:self.position]
         probabilities = priorities ** self.alpha
         probabilities /= probabilities.sum()
         indices = np.random.choice(len(self.memory), batch_size, p=probabilities)
@@ -44,7 +34,6 @@ class ReplayMemory:
     def __len__(self):
         return len(self.memory)
 
-# Dueling DQN for kinematic obs
 class DuelingDQN(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(DuelingDQN, self).__init__()
@@ -60,12 +49,11 @@ class DuelingDQN(nn.Module):
         return value + advantage - advantage.mean()
 
 class RainbowAgent:
-    def __init__(self, state_dim, action_dim, lr=1e-4, gamma=0.99, batch_size=64, memory_size=100000, multi_step=3):
+    def __init__(self, state_dim, action_dim, lr=1e-4, gamma=0.99, batch_size=64, memory_size=100000):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.gamma = gamma
         self.batch_size = batch_size
-        self.multi_step = multi_step
         self.policy_net = DuelingDQN(state_dim, action_dim).to("cuda")
         self.target_net = DuelingDQN(state_dim, action_dim).to("cuda")
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
@@ -116,33 +104,3 @@ class RainbowAgent:
                        (1 - torch.tensor(dones, dtype=torch.float32).to("cuda")) * self.gamma * next_q
             td_errors = (current_q - target_q).abs().cpu().numpy()
             self.memory.update_priorities(indices, td_errors.tolist())
-
-def train_rainbow(env, agent, episodes=500, max_steps=1000):
-    for episode in range(episodes):
-        state, _ = env.reset()
-        state = state.flatten()
-        total_reward = 0
-        for step in range(max_steps):
-            action = agent.act(state)
-            next_state, reward, done, truncated, _ = env.step(action)
-            next_state = next_state.flatten()
-            agent.memory.push(state, action, reward, next_state, done)
-            agent.learn()
-            state = next_state
-            total_reward += reward
-            if done or truncated:
-                break
-        agent.update_target()
-        print(f"Episode {episode + 1}/{episodes}, Total Reward: {total_reward}")
-
-if __name__ == "__main__":
-    env = gym.make("highway-v0", config = {
-        "observation": {"type": "Kinematics", "features": ["x", "y", "vx", "vy"]},
-        "action": {"type": "DiscreteMetaAction"},
-        "reward_speed_range": [20, 30]
-    })
-    state_dim = np.prod(env.observation_space.shape)
-    action_dim = env.action_space.n
-    agent = RainbowAgent(state_dim, action_dim)
-    print(env.observation_space.shape)
-    train_rainbow(env, agent)
