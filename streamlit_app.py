@@ -1,99 +1,148 @@
 # streamlit_app.py
 
 import streamlit as st
+import pandas as pd
 import os
-import numpy as np
-from agents.rainbow_agent import RainbowAgent
-from utils.visualizations import streamlit_plot_rewards, display_gif
-from environments.setup_env import create_highway_env
 
-# Optional imports for other agent demos
-# from agents.a3c_agent import A3CAgent
-# from agents.decision_transformer.dt_agent import DecisionTransformer
+st.set_page_config(page_title="Highway RL Portfolio Demo", layout="wide")
 
-st.set_page_config(page_title="Highway RL Portfolio Demo", layout="centered")
+# Title and intro
+st.title("🚗 Highway Reinforcement Learning Portfolio")
+st.markdown("""
+Welcome to my **industry-ready RL project demo**!  
+Select an agent from the sidebar to view training curves and demo videos.
+""")
 
-st.title("🚗 Highway RL Portfolio Demo")
-st.markdown(
-    """
-    Welcome to my industry-ready RL project demo!  
-    - Choose an agent 👇  
-    - Run a quick demo or load sample results  
-    - Visualize agent performance & download plots  
-    - See my explanations and portfolio links below
-    """
-)
-
-st.sidebar.header("Agent Selection")
+# Sidebar for agent selection
+st.sidebar.header("🎯 Agent Selection")
 agent_name = st.sidebar.selectbox(
-    "Choose RL Agent",
-    ["Rainbow DQN", "A3C (demo only)", "Decision Transformer (demo only)"]
+    "Choose RL Agent:",
+    ["Rainbow DQN", "A3C", "Decision Transformer"]
 )
-
-show_demo = st.sidebar.button("Run Demo Training (Fast)")
 
 st.sidebar.markdown("---")
-st.sidebar.header("Show Sample Results")
-sample_result = st.sidebar.selectbox(
-    "Type",
-    ["Rainbow", "Decision Transformer"]
-)
+st.sidebar.markdown("### 📊 About This Project")
+st.sidebar.markdown("""
+- **Environment:** highway-env (gymnasium)
+- **Agents:** Rainbow DQN, A3C, Decision Transformer
+- **Tech Stack:** PyTorch, Streamlit, Python
+- **Training:** GPU-accelerated on CUDA
+""")
 
-if st.sidebar.button("Load Sample Curve"):
-    if sample_result == "Rainbow":
-        curve_path = "demo/sample_results/rainbow_learning_curves.png"
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🔗 Portfolio Links")
+st.sidebar.markdown("[LinkedIn](https://www.linkedin.com/in/your-profile)")
+st.sidebar.markdown("[GitHub Repo](https://github.com/Av1352/Highway-Reinforecement-Problem)")
+st.sidebar.markdown("[Resume (PDF)](your-resume-link)")
+
+# Main content area
+st.header(f"Agent: {agent_name}")
+
+# Define file paths based on agent selection
+if agent_name == "Rainbow DQN":
+    reward_file = "demo/sample_results/rainbow/rainbow_rewards.csv"
+    curve_img = "demo/sample_results/rainbow/rainbow_learning_curves.png"
+    demo_video = "demo/sample_results/rainbow/rainbow_demo.gif"
+    description = """
+    **Rainbow DQN** combines multiple improvements to Deep Q-Networks:
+    - Prioritized Experience Replay
+    - Dueling Network Architecture
+    - Double Q-Learning
+    - Multi-step Learning
+    
+    This agent learns to navigate highway traffic by maximizing cumulative rewards.
+    """
+elif agent_name == "A3C":
+    reward_file = "demo/sample_results/a3c/a3c_rewards.csv"
+    curve_img = "demo/sample_results/a3c/a3c_learning_curves.png"
+    demo_video = "demo/sample_results/a3c/a3c_demo.gif"
+    description = """
+    **A3C (Asynchronous Advantage Actor-Critic)** uses:
+    - Actor-Critic architecture
+    - Asynchronous parallel training
+    - Policy gradient optimization
+    
+    This agent learns both value estimation and policy selection simultaneously.
+    """
+else:  # Decision Transformer
+    reward_file = "demo/sample_results/dt/dt_rewards.csv"
+    curve_img = "demo/sample_results/dt/dt_learning_curve.png"
+    demo_video = "demo/sample_results/dt/dt_demo.gif"
+    description = """
+    **Decision Transformer** treats RL as a sequence modeling problem:
+    - Transformer architecture
+    - Offline learning from demonstrations
+    - Conditioned on desired returns
+    
+    This agent learns to replicate expert behavior from pre-collected trajectories.
+    """
+
+st.markdown(description)
+st.markdown("---")
+
+# Display training curve
+st.subheader("📈 Training Performance")
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    if os.path.exists(curve_img):
+        st.image(curve_img, caption=f"{agent_name} Learning Curve", use_container_width=True)
     else:
-        curve_path = "demo/sample_results/dt_learning_curve.png"
-    st.image(curve_path, caption=f"{sample_result} learning curve")
+        st.warning(f"Training curve not found at {curve_img}")
 
-if st.sidebar.button("Show Demo GIF"):
-    demo_gif_path = "demo/sample_results/demo_gif.gif"
-    display_gif(demo_gif_path, "Sample Highway Episode")
-
-st.markdown("## Results")
-if show_demo:
-    # Only run a FAST demo (10 episodes) due to local compute; full train on notebook/colab
-    env = create_highway_env()
-    state_dim = np.prod(env.observation_space.shape)
-    action_dim = env.action_space.n
-    agent = RainbowAgent(state_dim, action_dim)
-    st.write("Running Rainbow DQN demo training (10 episodes)...")
-    rewards = []
-    for episode in range(10):
-        s, _ = env.reset()
-        s = s.flatten()
-        total_reward = 0
-        for step in range(100):
-            action = agent.act(s)
-            next_s, r, done, truncated, _ = env.step(action)
-            next_s = next_s.flatten()
-            agent.memory.push(s, action, r, next_s, done)
-            agent.learn()
-            s = next_s
-            total_reward += r
-            if done or truncated:
-                break
-        agent.update_target()
-        rewards.append(total_reward)
-    streamlit_plot_rewards(rewards, "Rainbow DQN Demo Reward Curve")
-    st.success("Demo finished! Check the plot above. Full results and GIFs available in the sidebar.")
+with col2:
+    if os.path.exists(reward_file):
+        rewards_df = pd.read_csv(reward_file, header=None, names=["Reward"])
+        st.metric("Episodes Trained", len(rewards_df))
+        st.metric("Final Avg Reward (last 10)", f"{rewards_df['Reward'].tail(10).mean():.2f}")
+        st.metric("Max Reward", f"{rewards_df['Reward'].max():.2f}")
+    else:
+        st.info("Reward data not available")
 
 st.markdown("---")
-st.markdown("### Project Highlights")
-st.markdown(
-    """
-    - **Agents included:** Rainbow DQN, A3C, Decision Transformer
-    - **Environment:** highway-env from gymnasium
-    - Modular code (agents, utils, demos)
-    - Fast demo and sample results for instant recruiter feedback
-    """
-)
-st.markdown("---")
-st.markdown("### Portfolio Links")
-st.markdown("- [LinkedIn](your-link-here)")
-st.markdown("- [Resume (PDF)](your-link-here)")
+
+# Display demo video
+st.subheader("🎥 Agent Demo Video")
+if os.path.exists(demo_video):
+    if demo_video.endswith('.mp4'):
+        st.video(demo_video)
+    elif demo_video.endswith('.gif'):
+        st.image(demo_video, caption=f"{agent_name} Demo", use_container_width=True)
+else:
+    st.warning(f"Demo video not found at {demo_video}")
+    st.info("Run `python train_and_demo_agents.py` to generate demo videos.")
 
 st.markdown("---")
-st.markdown("**Want to reproduce or run full training?** See the README and notebooks for step-by-step instructions. Full results, GIFs, and detailed metrics are available in `demo/sample_results/`.")
 
-st.markdown("Made with ❤️ by Anju Vilashni Nandhakumar")
+# Additional details
+with st.expander("🔧 Implementation Details"):
+    st.markdown(f"""
+    ### {agent_name} Implementation
+    
+    **Key Features:**
+    - Modular, production-ready code structure
+    - GPU-accelerated training (CUDA support)
+    - Configurable hyperparameters
+    - Model checkpointing and evaluation
+    
+    **File Structure:**
+    - `agents/{agent_name.lower().replace(' ', '_')}_agent.py` - Agent implementation
+    - `utils/training.py` - Training utilities
+    - `utils/visualizations.py` - Plotting and analysis
+    - `environments/setup_env.py` - Environment configuration
+    
+    **Training Details:**
+    - Episodes: 200 (configurable)
+    - Learning rate: 1e-4
+    - Gamma (discount): 0.99
+    - Device: CUDA GPU (if available)
+    """)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center'>
+    <p>Made with ❤️ by Anju V | MS in AI @ Northeastern University</p>
+    <p>This project showcases modern reinforcement learning techniques for autonomous driving scenarios.</p>
+</div>
+""", unsafe_allow_html=True)
