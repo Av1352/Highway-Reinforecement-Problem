@@ -1,0 +1,9 @@
+torch
+gymnasium
+highway-env
+streamlit
+matplotlib
+numpy
+scikit-learn
+tqdm
+stable-baselines3
